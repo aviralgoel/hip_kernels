@@ -6,14 +6,15 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if( $ENV{HIP_PLATFORM} MATCHES "nvidia" )
-  message(STATUS "HIP_PLATFORM: nvidia")
-else()
-  message(STATUS "HIP_PLATFORM: amd")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Set the CMAKE_PREFIX_PATH to where HIP is installed only on Linux
+    set(CMAKE_PREFIX_PATH "/opt/rocm" CACHE STRING "Path to ROCm installation" FORCE)
 endif()
+
 # Find HIP package
 find_package(hip REQUIRED)
 
 # Add subdirectories (ch01, ch02, etc.)
 add_subdirectory(ch01)
 add_subdirectory(ch02)  # Add other subdirectories as needed
+add_subdirectory(ch03)
