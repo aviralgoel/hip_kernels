@@ -1,6 +1,7 @@
 # Define the local example list for ch01
 set(example_list
-  colorToGrayscale  # Add more examples as needed
+  03_colorToGrayscale
+  03_imageBlur  # Add more examples as needed
 )
 
 # Create executables for each example
