@@ -4,6 +4,7 @@
 - [Hello World Kernel ch01](#hello-world-kernel-ch01)
 - [Vector Addition Kernel ch02](#vector-addition-kernel-ch02)
 - [Color to Greyscale Conversion Kernel ch03](#color-to-greyscale-conversion-kernel-ch03)
+- [Image Blur Kernel ch03](#image-blur-kernel-ch03)
 ### <a name="hello-world-kernel"></a>Hello World Kernel ch01
 **Description**: Simple kernel that prints hello world from GPU threads along with their thread IDs and block IDs
 
@@ -12,4 +13,7 @@
 
 ### <a name="color-to-greyscale-conversion-kernel"></a>Color to Greyscale Conversion Kernel ch03
 **Description**: A kernel with 2D grid of 2D blocks of 16x16 threads. Each thread then converts the tuple of rgb pixel values into single float value on a grayscale spectrum.
+
+### <a name="image-blur-kernel"></a>Image Blur Kernel ch03
+**Description**: A kernel with 2D grid of 2D blocks of 32x32 threads. Each thread then sums the tuple of rgb pixel values into a cumulative average of neighbouring pixel values (patch size).
 
