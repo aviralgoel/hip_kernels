@@ -46,6 +46,10 @@
         "sstream": "cpp",
         "stdexcept": "cpp",
         "streambuf": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "03_imageblur": "cpp",
+        "chrono": "cpp",
+        "ctime": "cpp",
+        "ratio": "cpp"
     }
 }

@@ -24,7 +24,7 @@ void convertOnCPU(unsigned char *img, int width, int height);
 
 int main() {
   // Path to the input image
-  const char *imagePath = "TF2.jpg";
+  const char *imagePath = "../../resources/input/TF2.jpg";
 
   // Load the image
   int width, height;
@@ -58,9 +58,9 @@ int main() {
                       hipMemcpyDeviceToHost));
 
   // Save the grayscale image
-  const char *outputPathGray = "output_grayscale_GPU.jpg";
-  if (stbi_write_jpg(outputPathGray, width, height, 1, grayImage, 90)) {
-    std::cout << "Grayscale image saved as " << outputPathGray << std::endl;
+  const char *output_image = "../../resources/output/output_grayscale_GPU.jpg";
+  if (stbi_write_jpg(output_image, width, height, 1, grayImage, 90)) {
+    std::cout << "Grayscale image saved as " << output_image << std::endl;
   } else {
     std::cerr << "Failed to save grayscale image." << std::endl;
   }
