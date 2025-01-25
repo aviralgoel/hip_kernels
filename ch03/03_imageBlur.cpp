@@ -39,9 +39,12 @@ int main() {
                       numOfPixels * 3 * sizeof(unsigned char),
                       hipMemcpyHostToDevice));
 
-  dim3 blockDim(32, 32);
+  dim3 blockDim(32, 32); 
   dim3 gridDim((width + blockDim.x - 1) / blockDim.x,
                (height + blockDim.y - 1) / blockDim.y);
+
+  // each warp is 64 threads
+  // 32 * 32 / 64 = 
   int patchSize = 5;
 
   hipLaunchKernelGGL(HipImageBlur, gridDim, blockDim, 0, 0, d_originalImage,
