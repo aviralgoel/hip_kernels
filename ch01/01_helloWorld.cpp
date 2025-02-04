@@ -27,7 +27,7 @@ int main() {
   int threadsPerBlock = 4; // number of threads per block
 
   //hipLaunchKernelGGL(helloWorldKernel, dim3(numBlocks), dim3(threadsPerBlock),
-                     0, 0);
+  //                   0, 0);
 
   // Launch the kernel on GPU
   HIP_CHECK(hipLaunchKernelGGL(helloWorldKernel, dim3(numBlocks), dim3(threadsPerBlock),
