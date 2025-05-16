@@ -22,4 +22,30 @@
 ### <a name="square-matrix-multiplication-ch03"></a>[Matrix Matrix Multiplication Kernel ch03](./ch03/03_matrixMultiplication.cpp)
 **Description**: A 2D grid with 2D block of 32x32 threads kernel that multiplies two square matrices and verifies the result with CPU implementation.
 
+### Build Instructions
 
+To build and run the kernels:
+
+1. Create a build directory and navigate to it:
+    ```bash
+    mkdir -p build
+    cd build
+    ```
+
+2. Run CMake and make to build a specific target:
+    ```bash
+    cmake ..
+    make <target_name>
+    ```
+
+3. Execute the compiled binary:
+    ```bash
+    ./<chapter_directory>/<binary_name>
+    ```
+
+Example:
+```bash
+cmake .. && make 03_colorToGrayscale && ./ch03/03_colorToGrayscale
+```
+
+This will build and run the color to grayscale conversion kernel, which processes the input image and saves the result to `../resources/output/output_grayscale_GPU.jpg`.
