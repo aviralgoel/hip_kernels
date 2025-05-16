@@ -24,7 +24,7 @@ void convertOnCPU(unsigned char *img, int width, int height);
 
 int main() {
   // Path to the input image
-  const char *imagePath = "../../resources/input/TF2.jpg";
+  const char *imagePath = "../resources/input/TF2.jpg";
 
   // Load the image
   int width, height;
@@ -58,7 +58,7 @@ int main() {
                       hipMemcpyDeviceToHost));
 
   // Save the grayscale image
-  const char *output_image = "../../resources/output/output_grayscale_GPU.jpg";
+  const char *output_image = "../resources/output/output_grayscale_GPU.jpg";
   if (stbi_write_jpg(output_image, width, height, 1, grayImage, 90)) {
     std::cout << "Grayscale image saved as " << output_image << std::endl;
   } else {
@@ -91,7 +91,7 @@ void convertOnCPU(unsigned char *img, int width, int height) {
   }
 
   // Save the grayscale image
-  const char *outputPath = "output_grayscale_CPU.jpg";
+  const char *outputPath = "../resources/output/output_grayscale_CPU.jpg";
   if (stbi_write_jpg(outputPath, width, height, 1, grayscaleImg, 90)) {
     std::cout << "Grayscale image saved as " << outputPath << std::endl;
   } else {
@@ -102,6 +102,7 @@ void convertOnCPU(unsigned char *img, int width, int height) {
 }
 
 unsigned char *load_image(const char *imagePath, int &width, int &height) {
+  
   int channels;
   unsigned char *img = stbi_load(imagePath, &width, &height, &channels, 0);
   if (!img) {
