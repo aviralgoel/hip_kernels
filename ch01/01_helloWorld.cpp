@@ -30,8 +30,8 @@ int main() {
   //                   0, 0);
 
   // Launch the kernel on GPU
-  HIP_CHECK(hipLaunchKernelGGL(helloWorldKernel, dim3(numBlocks), dim3(threadsPerBlock),
-                     0, 0));
+  hipLaunchKernelGGL(helloWorldKernel, dim3(numBlocks), dim3(threadsPerBlock),
+                     0, 0);
 
   // wait for GPU to finish the work
   HIP_CHECK(hipDeviceSynchronize());
