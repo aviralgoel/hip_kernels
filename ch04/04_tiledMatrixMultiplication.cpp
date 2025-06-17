@@ -3,12 +3,13 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <vector>
 
 #define TILE_SIZE 32
 
 void generateMatrix(float *matrix, int rows, int cols);
 
-__global__ void matrixMultiplication(float *A, float *B, float *C, int N)
+__global__ void naiveMatrixMultiplication(float *A, float *B, float *C, int N)
 {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
@@ -66,21 +67,14 @@ int main()
     std::cout << "Matrix B: " << K << " x " << N << std::endl;
     std::cout << "Matrix C: " << M << " x " << N << std::endl;
 
-    float *h_A, *h_B, *h_tiledC, *h_C;
-
-    h_A = (float *)malloc(M * K * sizeof(float));
-    h_B = (float *)malloc(K * N * sizeof(float));
-    h_C = (float *)malloc(M * N * sizeof(float));
-    h_tiledC = (float *)malloc(M * N * sizeof(float));
-
-    if (!h_A || !h_B || !h_C || !h_tiledC) {
-        std::cerr << "Failed to allocate host memory" << std::endl;
-        return -1;
-    }
+    std::vector<float> h_A(M * K);
+    std::vector<float> h_B(K * N);
+    std::vector<float> h_C(M * N);
+    std::vector<float> h_tiledC(M * N);
 
     std::cout << "Generating input matrices..." << std::endl;
-    generateMatrix(h_A, M, K);
-    generateMatrix(h_B, K, N);
+    generateMatrix(h_A.data(), M, K);
+    generateMatrix(h_B.data(), K, N);
 
     float *d_A, *d_B, *d_C, *d_tiledC;
     HIP_CHECK(hipMalloc(&d_A, M * K * sizeof(float)));
@@ -89,11 +83,11 @@ int main()
     HIP_CHECK(hipMalloc(&d_tiledC, M * N * sizeof(float)));
 
     std::cout << "Copying input matrices to device..." << std::endl;
-    HIP_CHECK(hipMemcpy(d_A, h_A, M * K * sizeof(float), hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(d_B, h_B, K * N * sizeof(float), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_A, h_A.data(), M * K * sizeof(float), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(d_B, h_B.data(), K * N * sizeof(float), hipMemcpyHostToDevice));
 
-    dim3 block(TILE_SIZE, TILE_SIZE, 1);
-    dim3 grid((N + TILE_SIZE - 1) / TILE_SIZE, (M + TILE_SIZE - 1) / TILE_SIZE, 1);
+    dim3 block(TILE_SIZE, TILE_SIZE, 1); // threads layout per block    
+    dim3 grid((N + TILE_SIZE - 1) / TILE_SIZE, (M + TILE_SIZE - 1) / TILE_SIZE, 1); // blocks layout per grid
 
     hipEvent_t start, stop;
     HIP_CHECK(hipEventCreate(&start));
@@ -106,8 +100,8 @@ int main()
         tiledMatrixMultiplication, 
         grid, 
         block, 
-        0, 
-        0, 
+        0, // shared memory size
+        0, // stream
         d_A, d_B, d_tiledC, M, N, K
     );
 
@@ -122,7 +116,7 @@ int main()
     HIP_CHECK(hipEventRecord(start, 0));
 
     hipLaunchKernelGGL(
-        matrixMultiplication, 
+        naiveMatrixMultiplication, 
         grid, 
         block, 
         0, 
@@ -139,13 +133,8 @@ int main()
     HIP_CHECK(hipDeviceSynchronize());
 
     std::cout << "Copying output matrix to host..." << std::endl;
-    HIP_CHECK(hipMemcpy(h_C, d_C, M * N * sizeof(float), hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(h_tiledC, d_tiledC, M * N * sizeof(float), hipMemcpyDeviceToHost));
-
-    free(h_A);
-    free(h_B);
-    free(h_C);
-    free(h_tiledC);
+    HIP_CHECK(hipMemcpy(h_C.data(), d_C, M * N * sizeof(float), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(h_tiledC.data(), d_tiledC, M * N * sizeof(float), hipMemcpyDeviceToHost));
 
     HIP_CHECK(hipFree(d_A));
     HIP_CHECK(hipFree(d_B));
