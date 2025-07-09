@@ -26,7 +26,17 @@ void print_matrix(int *matrix, int M, int N)
 void cpu_gemm(int *A, int *B, int *C, int M, int N, int K)
 {   
     printf("Running CPU GEMM...\n");
+    int progress_interval = M / 20;  // Update every 5% (20 intervals = 5% each)
+    if (progress_interval == 0) progress_interval = 1;  // For small matrices
+    
     for (int i = 0; i < M; i++) {
+        // Show progress
+        if (i % progress_interval == 0 || i == M - 1) {
+            int percent = (int)((float)(i + 1) * 100.0f / M);
+            printf("\rCPU Progress: %d%% (%d/%d rows)", percent, i + 1, M);
+            fflush(stdout);  // Force immediate output
+        }
+        
         for (int j = 0; j < N; j++) {
             C[i * N + j] = 0;
             for (int k = 0; k < K; k++) {
@@ -34,6 +44,7 @@ void cpu_gemm(int *A, int *B, int *C, int M, int N, int K)
             }
         }
     }
+    printf("\n");  // New line after completion
 }
 void compare_matrices(int *C_gpu, int *C_cpu, int M, int N)
 {
