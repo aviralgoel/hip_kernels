@@ -16,5 +16,11 @@ find_package(hip REQUIRED)
 
 # Add subdirectories (ch01, ch02, etc.)
 add_subdirectory(ch01)
-add_subdirectory(ch02)  # Add other subdirectories as needed
+add_subdirectory(ch02)
 add_subdirectory(ch03)
+add_subdirectory(ch04)
+add_subdirectory(gemm)
+
+set(CMAKE_CXX_COMPILER "/opt/rocm/bin/amdclang++")
+set(CMAKE_HIP_COMPILER "/opt/rocm/bin/amdclang++")
+add_definitions(-D__HIP_PLATFORM_AMD__)
