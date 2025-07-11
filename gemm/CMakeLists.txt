@@ -1,6 +1,7 @@
 # Define the local example list for ch01
 set(example_list
     naive_gemm 
+    tiled_gemm
 )
 
 # Create executables for each example

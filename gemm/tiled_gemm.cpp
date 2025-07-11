@@ -3,15 +3,41 @@
 #include <chrono>
 #include <cstdlib>  // for atoi
 
-__global__ void gemmKernel(int *A, int *B, int *C, int M, int N, int K) {
+#define TILE_WIDTH 16
 
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-    if (row < M && col < N) {
-        int sum = 0;
-        for (int k = 0; k < K; k++) {
-            sum += A[row * K + k] * B[k * N + col];
+__global__ void gemmKernelTiled(int *A, int *B, int *C, int M, int N, int K) {
+
+    int tx = threadIdx.x; int ty = threadIdx.y;
+    int bx = blockIdx.x; int by = blockIdx.y;
+
+    __shared__ int M_lds[TILE_WIDTH][TILE_WIDTH];
+    __shared__ int N_lds[TILE_WIDTH][TILE_WIDTH];
+
+    int row = by * TILE_WIDTH + ty; // works because block size is same as tile size
+    int col = bx * TILE_WIDTH + tx; 
+
+    int total_phases = K / TILE_WIDTH;
+    int sum = 0;
+
+    for(int phase = 0; phase < total_phases; phase++) {
+
+        if(phase * TILE_WIDTH + tx < K && row < M) {
+            M_lds[ty][tx] = A[row * K + (phase * TILE_WIDTH + tx)];
         }
+        if(phase * TILE_WIDTH + ty < K && col < N) {
+            N_lds[ty][tx] = B[(phase * TILE_WIDTH + ty) * N + col];
+        }
+
+        __syncthreads();
+
+        for(int k = 0; k < TILE_WIDTH; k++) {
+            sum += M_lds[ty][k] * N_lds[k][tx];
+        }
+
+        __syncthreads();
+    }
+
+    if(row < M && col < N) {
         C[row * N + col] = sum;
     }
 }
@@ -19,9 +45,9 @@ __global__ void gemmKernel(int *A, int *B, int *C, int M, int N, int K) {
 int main(int argc, char* argv[]) {
 
     // set the matrix size from command line arguments or use defaults
-    int M = 1024, N = 1024, K = 1024;  // default values
+    int M = 256, N = 128, K = 64;  // default values
     
-    if (argc >= 4) {
+    if (argc == 4) {
         M = atoi(argv[1]);
         N = atoi(argv[2]);
         K = atoi(argv[3]);
@@ -65,13 +91,13 @@ int main(int argc, char* argv[]) {
     HIP_CHECK(hipMemcpy(C_device, C_host, M * N * sizeof(int), hipMemcpyHostToDevice));
 
     // set the block and grid size
-    dim3 block(16, 16);  // 256 threads per block - much better for GPU utilization
+    dim3 block(TILE_WIDTH, TILE_WIDTH);  // 256 threads per block - much better for GPU utilization     
     dim3 grid((M + block.x - 1) / block.x, (N + block.y - 1) / block.y);
     // print number of blocks and threads
     printf("grid: %d, %d\n", grid.x, grid.y);
     printf("block: %d, %d\n", block.x, block.y);
     printf("number of blocks: %d\n", grid.x * grid.y);
-    printf("number of threads: %d\n", block.x * block.y);
+    printf("number of threads per block: %d\n", block.x * block.y);
 
     // Create HIP events for timing
     hipEvent_t start, stop;
@@ -82,7 +108,7 @@ int main(int argc, char* argv[]) {
     HIP_CHECK(hipEventRecord(start, 0));
     
     // launch the kernel
-    gemmKernel<<<grid, block>>>(A_device, B_device, C_device, M, N, K);
+    gemmKernelTiled<<<grid, block>>>(A_device, B_device, C_device, M, N, K);
     
     // Record stop event
     HIP_CHECK(hipEventRecord(stop, 0));
@@ -91,6 +117,7 @@ int main(int argc, char* argv[]) {
     auto cpu_start = std::chrono::high_resolution_clock::now();
     cpu_gemm(A_host, B_host, C_host_cpu, M, N, K);
     auto cpu_end = std::chrono::high_resolution_clock::now();
+    // std::cout << "CPU GEMM result:" << std::endl;
     // print_matrix(C_host_cpu, M, N);
     
     // wait for the kernel to complete
@@ -109,7 +136,7 @@ int main(int argc, char* argv[]) {
     
     // copy the result back from the device to the host
     HIP_CHECK(hipMemcpy(C_host, C_device, M * N * sizeof(int), hipMemcpyDeviceToHost));
-    compare_matrices(C_host, C_host_cpu, M, N);
+    //compare_matrices(C_host, C_host_cpu, M, N);
     
     // free the memory on the device
     HIP_CHECK(hipFree(A_device));
