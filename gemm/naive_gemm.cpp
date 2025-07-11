@@ -5,8 +5,9 @@
 
 __global__ void gemmKernel(int *A, int *B, int *C, int M, int N, int K) {
 
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int col = blockIdx.y * blockDim.y + threadIdx.y;
+    
     if (row < M && col < N) {
         int sum = 0;
         for (int k = 0; k < K; k++) {
