@@ -1,5 +1,0 @@
-/home/avirgoel/learning/hip_kernels/gemm/CMakeFiles/naive_gemm.dir
-/home/avirgoel/learning/hip_kernels/gemm/CMakeFiles/tiled_gemm.dir
-/home/avirgoel/learning/hip_kernels/gemm/CMakeFiles/online_softmax.dir
-/home/avirgoel/learning/hip_kernels/gemm/CMakeFiles/edit_cache.dir
-/home/avirgoel/learning/hip_kernels/gemm/CMakeFiles/rebuild_cache.dir

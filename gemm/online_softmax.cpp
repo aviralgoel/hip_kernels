@@ -102,7 +102,7 @@ int main() {
   Kernel Two
   For optimized implementation, we can assume
   1. Reduce three passes to two passes
-  2. Granularity of work is one row per threadBlock
+  2. Granularity of work is one row per thread
   */
   int threadsPerBlock = 1024;
   int blocksPerGrid = (M + threadsPerBlock - 1) / threadsPerBlock;
