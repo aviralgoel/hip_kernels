@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
+#include <iomanip>
 
 void initialize_matrix(int *matrix, int M, int N)
 {
@@ -19,6 +20,27 @@ void print_matrix(int *matrix, int M, int N)
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {
             std::cout << matrix[i * N + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
+void initialize_matrix(float *matrix, int M, int N)
+{
+    printf("Initializing matrix...\n");
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            matrix[i * N + j] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 9.0f + 1.0f;  
+        }
+    }
+}
+
+void print_matrix(float *matrix, int M, int N)
+{
+    printf("Printing matrix...\n");
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            std::cout << std::fixed << std::setprecision(2) << matrix[i * N + j] << " ";
         }
         std::cout << std::endl;
     }
@@ -66,5 +88,44 @@ void compare_matrices(int *C_gpu, int *C_cpu, int M, int N)
         printf("Matrices are not equal\n");
         printf("Error count: %d\n", error_count);
         printf("Error percentage: %.2f%%\n", (float)error_count / (M * N) * 100);
+    }
+}
+
+void compare_float_matrices(float* gpu_result, float* cpu_result, int M, int N, float tolerance = 1e-6f) {
+    printf("Comparing matrices...\n");
+    int error_count = 0;
+    float max_diff = 0.0f;
+    
+    // for each element in the matrices
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            
+            float diff = fabs(gpu_result[i * N + j] - cpu_result[i * N + j]);
+            
+            // max difference for the whole matrix
+            if (diff > max_diff) {
+                max_diff = diff;
+            }
+            
+            // is this error acceptable?
+            if (diff > tolerance) {
+
+                // print the first 10 errors
+                if (error_count < 10) {
+                    printf("Error at position (%d, %d): GPU = %.6f, CPU = %.6f, diff = %.9f\n", 
+                           i, j, gpu_result[i * N + j], cpu_result[i * N + j], diff);
+                }
+                error_count++;
+            }
+        }
+    }
+    
+    if (error_count == 0) {
+        printf("Matrices are equal (within tolerance %.9f)\n", tolerance);
+        printf("Max difference: %.9f\n", max_diff);
+    } else {
+        printf("Matrices are not equal\n");
+        printf("Error count: %d (%.2f%%)\n", error_count, (float)error_count / (M * N) * 100);
+        printf("Max difference: %.9f\n", max_diff);
     }
 }

@@ -2,6 +2,7 @@
 set(example_list
     naive_gemm 
     tiled_gemm
+    online_softmax
 )
 
 # Create executables for each example
