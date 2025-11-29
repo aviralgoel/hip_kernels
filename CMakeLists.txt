@@ -20,6 +20,7 @@ add_subdirectory(ch02)
 add_subdirectory(ch03)
 add_subdirectory(ch04)
 add_subdirectory(gemm)
+add_subdirectory(convolution)
 
 set(CMAKE_CXX_COMPILER "/opt/rocm/bin/amdclang++")
 set(CMAKE_HIP_COMPILER "/opt/rocm/bin/amdclang++")
