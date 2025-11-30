@@ -1,6 +1,7 @@
 # Define the local example list for ch01
 set(example_list
-basic_convolution
+basic_convolution_Fcmem
+naive_convolution
 )
 
 # Create executables for each example
