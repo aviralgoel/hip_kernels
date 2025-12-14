@@ -3,7 +3,10 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
+#include <ctime>
 #include <iomanip>
+#include <type_traits>
+#include <omp.h>
 
 void initialize_matrix(int *matrix, int M, int N)
 {
@@ -127,5 +130,32 @@ void compare_float_matrices(float* gpu_result, float* cpu_result, int M, int N, 
         printf("Matrices are not equal\n");
         printf("Error count: %d (%.2f%%)\n", error_count, (float)error_count / (M * N) * 100);
         printf("Max difference: %.9f\n", max_diff);
+    }
+}
+
+// Host matrix data random initialization with OpenMP parallelization
+template <typename DataT>
+static inline void fillRand(DataT* mat, uint32_t m, uint32_t n)
+{
+    auto randInit = []() {
+        srand(time(0));
+        return 0u;
+    };
+
+    static auto init = randInit();
+    
+    #pragma omp parallel for
+    for(int i = 0; i < m; ++i)
+    {
+        auto rando = rand() % 5u;
+        for(int j = 0; j < n; j++)
+        {
+            // Assign random integer values within 0-4, alternating
+            // sign if the value is a multiple of 3
+            auto value     = (rando + j) % 5u;
+            mat[i * n + j] = ((value % 3u == 0u) && std::is_signed<DataT>::value)
+                                 ? -static_cast<DataT>(value)
+                                 : static_cast<DataT>(value);
+        }
     }
 }
