@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <iomanip>
+#include <chrono>
 
 #include <hip/hip_runtime.h>
 #include "../include/HIP/HIP_Utils.hpp"

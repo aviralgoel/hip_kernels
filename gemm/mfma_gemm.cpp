@@ -9,30 +9,14 @@
 #include <hip/hip_runtime.h>
 
 #include "../utility/hip_utility.hpp"
-#include "../utility/ops_gemm.hpp"  // For fillRand utility function
-#include "../include/math.hpp"  // For ceilDiv utility function
-#include "../include/mfma_utility.hpp"  // For MFMA load functions
-
-/////////////
-// Helpers //
-/////////////
+#include "../utility/ops_gemm.hpp"  
+#include "../include/math.hpp"  
+#include "../include/mfma_utility.hpp"  
 
 
-// GPU device function to fill all elements of a SIMD vector with the same value.
-// Broadcasts a scalar value to all Rank elements of the vector.
-// Usage: vectorFill(my_float4_vec, 0.0f); // Sets all 4 elements to 0.0f
-template <typename T, uint32_t Rank>
-__device__ void vectorFill(VecT<T, Rank> &v, T value)
-{
-    for (uint32_t i = 0; i < Rank; i++)
-    {
-        v[i] = value;
-    }
-}
-
+////////////////
+// Constants /// 
 ///////////////
-// Constants // 
-//////////////
 
 const int WAVE_SIZE = 64; // Number of threads in a wavefront
 
@@ -43,25 +27,25 @@ const int BLOCK_M = 16; // MFMA block size in the M dimension
 const int BLOCK_N = 16; // MFMA block size in the N dimension
 const int BLOCK_K = 16; // MFMA block size in the K dimension
 
-///////////
-// Types //
-///////////
 
-using float16_t = _Float16;  // C++ standard half-precision floating-point type
-using float32_t = float;
-
+////////////////
+// Fragments ///
+////////////////
 // Fragments (per thread vector) for MFMA.
 using AFragT = VecT<float16_t, BLOCK_M * BLOCK_K / WAVE_SIZE>; // Fragment of A matrix for MFMA.
 using BFragT = VecT<float16_t, BLOCK_K * BLOCK_N / WAVE_SIZE>; // Fragment of B matrix for MFMA.
 using AccumFragT = VecT<float32_t, BLOCK_M * BLOCK_N / WAVE_SIZE>; // Fragment of accumulator for MFMA.
-using CFragT = VecT<float16_t, BLOCK_M * BLOCK_N / WAVE_SIZE>; // Fragment of C matrix for MFMA.
+using CFragT = VecT<float32_t, BLOCK_M * BLOCK_N / WAVE_SIZE>; // Fragment of C/D matrix (float32 output).
 
-// wrapper for the MFMA instruction.
+// Wrapper for the MFMA instruction (kernel-specific types)
 __device__ AccumFragT mfma_f32_16x16x16_f16(AFragT afr, BFragT bfr, AccumFragT accumfr)
 {
     return __builtin_amdgcn_mfma_f32_16x16x16f16(afr, bfr, accumfr, 0, 0, 0);
 }
 
+////////////////
+// Kernel ///
+/////////////
 
 __global__ void sgemm_example_d(uint32_t     m,
                                 uint32_t     n,
@@ -70,52 +54,56 @@ __global__ void sgemm_example_d(uint32_t     m,
                                 float16_t const* b,
                                 float32_t const* c,
                                 float32_t*       d,
-                                uint32_t     lda,
-                                uint32_t     ldb,
-                                uint32_t     ldc,
-                                uint32_t     ldd,
-                                float32_t        alpha,
-                                float32_t        beta)
+                                uint32_t     lda, // number of elements to skip to get to the next col (in col major)
+                                uint32_t     ldb, // number of elements to skip to get to the next row (in row major)
+                                uint32_t     ldc, // number of elements to skip to get to the next col (in col major)
+                                uint32_t     ldd, // number of elements to skip to get to the next col (in col major)
+                                float32_t        alpha, // scalar multiplier for the result
+                                float32_t        beta) // scalar multiplier for the result
 {
-    AFragT fragA = AFragT{};
-    BFragT fragB = BFragT{};
-    AccumFragT fragAcc = AccumFragT{};
+    AFragT fragA = AFragT{}; // VGPR for A matrix
+    BFragT fragB = BFragT{}; // VGPR for B matrix
+    AccumFragT fragAcc = AccumFragT{}; // VGPR for accumulator
 
-    vectorFill(fragAcc, 0.0f); 
+    vectorFill(fragAcc, 0.0f); // initialize the accumulator to 0.0f
     
-    auto waveGridX = (blockIdx.x * blockDim.x + threadIdx.x) / WAVE_SIZE;
-    auto waveGridY = (blockIdx.y * blockDim.y + threadIdx.y);
+    auto waveGridX = (blockIdx.x * blockDim.x + threadIdx.x) / WAVE_SIZE; // get the x coordinate of the current wave
+    auto waveGridY = (blockIdx.y * blockDim.y + threadIdx.y); // get the y coordinate of the current wave
 
-    auto cRow = waveGridX * BLOCK_M;
-    auto cCol = waveGridY * BLOCK_N;
+    auto cRow = waveGridX * BLOCK_M; // get the row coordinate of the current block in the output matrix
+    auto cCol = waveGridY * BLOCK_N; // get the column coordinate of the current block in the output matrix
 
-    if (cRow < m && cCol < n) 
+    if (cRow < m && cCol < n) // check if the current block is within the bounds of the output matrix
     {
-        ///
-        /// Step 1: accumulate A x B by stepping through k dimension
-        ///
-        for(int i = 0; i < k; i += BLOCK_K)
-        {
-            // Load the inputs.
-            // Flatten 2D coord (row, col) into 1D, knowing:
-            // A = col major, BLOCK_M x BLOCK_K
-            // B = row major, BLOCK_K x BLOCK_N
-            fragA = load_A_16x16_col_major<AFragT, BLOCK_M>(a + (cRow  + i * lda), lda);
-            fragB = load_B_16x16_row_major<BFragT, BLOCK_N>(b + (i * ldb + cCol), ldb);
 
-            // // Matrix multiply-accumulate using MFMA units
-            // // Accumulation intermediate = BLOCK_M x BLOCK_N
-            // fragAcc = mfma_f32_16x16x16f16(fragA, fragB, fragAcc);
+        // For each wave
+        for(int i = 0; i < k; i += BLOCK_K) // step through the k dimension in blocks of BLOCK_K
+        {
+
+            fragA = load_A_16x16_col_major<AFragT, BLOCK_M>(a + (cRow  + i * lda), lda); // load the A matrix into the VGPR for the current block
+            fragB = load_B_16x16_row_major<BFragT, BLOCK_N>(b + (i * ldb + cCol), ldb); // load the B matrix into the VGPR for the current block
+
+
+            fragAcc = mfma_f32_16x16x16_f16(fragA, fragB, fragAcc); // multiply the A and B matrices and accumulate the result
         }
+
+        auto fragC = load_C_16x16_col_major<CFragT, BLOCK_N>(c + (cRow + cCol * ldc), ldc); // load the C matrix into the VGPR for the current block
+
+        for(int i = 0; i < vectorSize(fragC); ++i)
+        {
+            fragC[i] = alpha * fragAcc[i] + beta * fragC[i]; // multiply the accumulator by the alpha and beta scalars and add the result to the C matrix
+        }
+
+        store_C_16x16_col_major<CFragT, BLOCK_N>(d + (cRow  + cCol * ldd), fragC, ldd); // store the result back into the output matrix
     }
 }
 
 
 
-////////////
-// Functions //
-/////////////   
-void gemm_mfma(int M, int N, int K, float alpha, float beta);
+////////////////
+// Functions ///
+///////////////   
+void gemm_mfma(int M, int N, int K, float alpha, float beta); // function to perform the GEMM operation
 
 int main(int argc, char* argv[]) {
     
@@ -252,4 +240,39 @@ void gemm_mfma(int M, int N, int K, float alpha, float beta)
               << "elapsedMs: " << elapsedTimeMs << ", Problem Size(GFlops): " << gFlops << ", TFlops/s: " << tFlopsPerSec << std::endl;
 
     std::cout << "\nValidating result with reference..." << std::endl;
+
+        // Bring kernel result back to host
+        HIP_CHECK(hipMemcpy(D.data(), d_D, M * N * sizeof(float32_t), hipMemcpyDeviceToHost));
+
+        // Setup and run reference computation
+        std::vector<float32_t> D_ref(M * N, std::numeric_limits<float>::signaling_NaN());
+        gemm_cpu_h<float16_t, float32_t, float32_t, col_major, row_major, col_major>(M,
+                                                                                    N,
+                                                                                    K,
+                                                                                    A.data(),
+                                                                                    B.data(),
+                                                                                    C.data(),
+                                                                                    D_ref.data(),
+                                                                                    lda, ldb, ldc, ldd, alpha, beta);
+
+        auto res = compareEqual(D.data(), D_ref.data(), M * N);
+
+        if(std::get<0>(res) == false)
+        {
+            std::cout << "FAILED!\n";
+        }
+        else
+        {
+            std::cout << "PASSED!\n";
+        }
+    
+        std::cout << "Max relative error: " << std::get<1>(res) << std::endl;
+    
+        // Release device memory
+        HIP_CHECK(hipFree(d_A));
+        HIP_CHECK(hipFree(d_B));
+        HIP_CHECK(hipFree(d_C));
+        HIP_CHECK(hipFree(d_D));
+    
+        std::cout << "Finished!" << std::endl;
 }

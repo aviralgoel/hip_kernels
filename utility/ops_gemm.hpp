@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <type_traits>
 #include <omp.h>
+#include <cmath>
+#include <mutex>
 
 void initialize_matrix(int *matrix, int M, int N)
 {
@@ -156,6 +158,131 @@ static inline void fillRand(DataT* mat, uint32_t m, uint32_t n)
             mat[i * n + j] = ((value % 3u == 0u) && std::is_signed<DataT>::value)
                                  ? -static_cast<DataT>(value)
                                  : static_cast<DataT>(value);
+        }
+    }
+}
+
+struct row_major{};
+struct col_major{};
+
+// Element-wise comparison
+template <typename DataT>
+__host__ std::pair<bool, double>
+         compareEqual(DataT const* a, DataT const* b, uint32_t size, double tolerance = 10.0)
+{
+    bool   retval             = true;
+    double max_relative_error = 0.0;
+
+    // Some types don't have direct conversion to double.
+    // Convert to float first then to double.
+    auto toDouble = [](DataT const& val) { return static_cast<double>(static_cast<float>(val)); };
+
+    bool       isInf = false;
+    bool       isNaN = false;
+    std::mutex writeMutex;
+
+#pragma omp parallel for
+    for(int i = 0; i < size; ++i)
+    {
+        auto valA = a[i];
+        auto valB = b[i];
+
+        auto numerator = fabs(toDouble(valA) - toDouble(valB));
+        auto divisor   = fabs(toDouble(valA)) + fabs(toDouble(valB)) + 1.0;
+
+        if(std::isinf(numerator) || std::isinf(divisor))
+        {
+#pragma omp atomic
+            isInf |= true;
+        }
+        else
+        {
+            auto relative_error = numerator / divisor;
+            if(std::isnan(relative_error))
+            {
+#pragma omp atomic
+                isNaN |= true;
+            }
+            else if(relative_error > max_relative_error)
+            {
+                const std::lock_guard<std::mutex> guard(writeMutex);
+                // Double check in case of stall
+                if(relative_error > max_relative_error)
+                {
+                    max_relative_error = relative_error;
+                }
+            }
+        }
+
+        if(isInf || isNaN)
+        {
+            i = size;
+        }
+    }
+
+    auto eps = toDouble(std::numeric_limits<DataT>::epsilon());
+    if(isInf)
+    {
+        retval             = false;
+        max_relative_error = std::numeric_limits<DataT>::infinity();
+    }
+    else if(isNaN)
+    {
+        retval             = false;
+        max_relative_error = std::numeric_limits<DataT>::signaling_NaN();
+    }
+    else if(max_relative_error > (eps * tolerance))
+    {
+        retval = false;
+    }
+
+    return std::make_pair(retval, max_relative_error);
+}
+
+// Host GEMM validation
+template <typename InputT,
+          typename OutputT,
+          typename ComputeT,
+          typename LayoutA,
+          typename LayoutB,
+          typename LayoutC,
+          typename LayoutD = LayoutC>
+__host__ void gemm_cpu_h(uint32_t       m,
+                         uint32_t       n,
+                         uint32_t       k,
+                         InputT const*  a,
+                         InputT const*  b,
+                         OutputT const* c,
+                         OutputT*       d,
+                         uint32_t       lda,
+                         uint32_t       ldb,
+                         uint32_t       ldc,
+                         uint32_t       ldd,
+                         ComputeT       alpha,
+                         ComputeT       beta)
+{
+    auto rowMjr = [](uint32_t row, uint32_t col, uint32_t ld) { return row * ld + col; };
+    auto colMjr = [](uint32_t row, uint32_t col, uint32_t ld) { return col * ld + row; };
+
+    auto aIndex = std::is_same<LayoutA, row_major>::value ? rowMjr : colMjr;
+    auto bIndex = std::is_same<LayoutB, row_major>::value ? rowMjr : colMjr;
+    auto cIndex = std::is_same<LayoutC, row_major>::value ? rowMjr : colMjr;
+    auto dIndex = std::is_same<LayoutD, row_major>::value ? rowMjr : colMjr;
+
+#pragma omp parallel for
+    for(int i = 0; i < m; ++i)
+    {
+#pragma omp parallel for
+        for(int j = 0; j < n; ++j)
+        {
+            ComputeT accum = static_cast<ComputeT>(0);
+            for(int h = 0; h < k; ++h)
+            {
+                accum += static_cast<ComputeT>(a[aIndex(i, h, lda)])
+                         * static_cast<ComputeT>(b[bIndex(h, j, ldb)]);
+            }
+            d[dIndex(i, j, ldd)] = static_cast<OutputT>(
+                alpha * accum + beta * static_cast<ComputeT>(c[cIndex(i, j, ldc)]));
         }
     }
 }
