@@ -2,6 +2,7 @@
 set(example_list
 basic_convolution_Fcmem
 naive_convolution
+tiled_convolution
 )
 
 # Create executables for each example
