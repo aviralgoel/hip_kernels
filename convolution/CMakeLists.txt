@@ -1,4 +1,4 @@
-# Define the local example list for ch01
+# Define the local example list for convolution
 set(example_list
 basic_convolution_Fcmem
 naive_convolution

@@ -1,4 +1,5 @@
 #include <cstdlib> // rand()
+#include <cmath>   // fabs()
 #include <hip/hip_runtime.h>
 #include <iostream>
 

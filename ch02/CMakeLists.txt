@@ -1,4 +1,4 @@
-# Define the local example list for ch01
+# Define the local example list for ch02
 set(example_list
   02_vecAdd  # Add more examples as needed
 )

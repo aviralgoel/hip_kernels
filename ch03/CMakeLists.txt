@@ -1,4 +1,4 @@
-# Define the local example list for ch01
+# Define the local example list for ch03
 set(example_list
   03_colorToGrayscale
   03_imageBlur

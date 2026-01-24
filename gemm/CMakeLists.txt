@@ -1,4 +1,4 @@
-# Define the local example list for ch01
+# Define the local example list for gemm
 set(example_list
     naive_gemm 
     tiled_gemm
