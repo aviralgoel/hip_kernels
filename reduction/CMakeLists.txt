@@ -4,6 +4,8 @@ set(example_list
     02_reduction_shared
     03_reduction_sequential
     04_reduction_contiguous
+    05_warp_reduce
+    06_grid_reduction
 )
 
 # Create executables for each example
